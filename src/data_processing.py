@@ -81,4 +81,30 @@ def load_processed_data(input_dir):
     with open(product_map_filepath, "rb") as f:
         product_map = pickle.load(f)
 
-    return data_matrix, user_map, product_map                
+    return data_matrix, user_map, product_map  
+
+def filter_k_core(data, k=5):
+    filtered_data = data.copy()
+    iteration = 0
+
+    while True:
+        iteration += 1
+        original_shape = filtered_data.shape[0]
+
+        user_ids, user_counts = np.unique(filtered_data[:, 0], return_counts=True)
+        valid_users = user_ids[user_counts >= k]
+        mask_users = np.isin(filtered_data[:, 0], valid_users)
+        filtered_data = filtered_data[mask_users]
+
+        product_ids, product_counts = np.unique(filtered_data[:, 1], return_counts=True)
+        valid_products = product_ids[product_counts >= k]
+        mask_products = np.isin(filtered_data[:, 1], valid_products)
+        filtered_data = filtered_data[mask_products]
+
+        current_shape = filtered_data.shape[0]
+        if original_shape == current_shape:
+            break
+    return filtered_data
+
+
+ 
