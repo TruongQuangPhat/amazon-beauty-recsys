@@ -121,10 +121,23 @@ def add_time_features(data):
     enhanced_data = np.hstack((data, years.reshape(-1, 1), time_weights.reshape(-1, 1)))
     return enhanced_data
 
-def perform_hypothesis_test(data, year_a=2013, year_b=2014):
+def perform_hypothesis_test(data, year_a=2013, year_b=2014, confidence_level=0.95):
     """Performs Z-Test comparing ratings between two years."""
     print(f"\nPerforming Z-Test: Ratings in {year_b} > {year_a}?")
-    print("H0: Mean_B - Mean_A = 0 | H1: Mean_B - Mean_A > 0")
+    print(f"Hypothesis: H0: Mean_B <= Mean_A | H1: Mean_B > Mean_A")
+    print(f"Confidence Level: {confidence_level * 100}%")
+
+    z_critical_table = {
+        0.90: 1.282,
+        0.95: 1.645,
+        0.99: 2.326
+    }
+
+    if confidence_level not in z_critical_table:
+        print(f"Error: Confidence level {confidence_level} is not supported in NumPy-only mode.")
+        print("Supported levels: 0.90, 0.95, 0.99")
+        return
+    z_critical = z_critical_table[confidence_level]
     
     # Year is at index 4
     years_col = data[:, 4].astype(int)
@@ -143,6 +156,10 @@ def perform_hypothesis_test(data, year_a=2013, year_b=2014):
     
     # Z-score calculation
     pooled_se = np.sqrt((var_b / n_b) + (var_a / n_a))
+    if pooled_se == 0:
+        print("Error: Pooled standard error is zero, cannot compute Z-score.")
+        return
+
     z_score = (mean_b - mean_a) / pooled_se
     
     print(f"   Z-Score: {z_score:.4f}")
