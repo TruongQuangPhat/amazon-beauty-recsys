@@ -5,60 +5,57 @@ import csv
 
 def process_csv_to_numpy(input_filepath):
     print(f"Starting to process CSV file: {input_filepath}")
-
     user_map = {}
     product_map = {}
-
     current_user_index = 0
     current_product_index = 0
-
     temp_data = []
     corrupted_rows = []
 
     try:
         with open(input_filepath, "r", encoding="utf-8") as file:
             reader = csv.reader(file)
-            header = next(reader)  # Skip header row
+            header = next(reader, None)
 
             for i, row in enumerate(reader):
-                # # Check for corrupted rows (missing columns)
                 if len(row) < 4:
                     corrupted_rows.append((i, row))
                     continue
+                
                 user_str, product_str, rating_str, timestamp_str = row
 
                 if user_str not in user_map:
                     user_map[user_str] = current_user_index
                     current_user_index += 1
-                user_index = user_map[user_str]
-
+                
                 if product_str not in product_map:
                     product_map[product_str] = current_product_index
                     current_product_index += 1
-                product_index = product_map[product_str]
 
                 try:
-                    temp_data.append([user_index, product_index, float(rating_str), int(timestamp_str)])
+                    temp_data.append([user_map[user_str], product_map[product_str], float(rating_str), int(timestamp_str)])
                 except ValueError:
                     corrupted_rows.append((i, row))
                     continue
+                    
     except FileNotFoundError:
         print(f"Error: File {input_filepath} not found.")
         return None, None, None, []
     
-    print(f"Converting data to NumPy array.")
     data_matrix = np.array(temp_data, dtype=np.float32)
-
+    print(f"Raw Data shape: {data_matrix.shape}")
     return data_matrix, user_map, product_map, corrupted_rows
 
 
 def save_processed_data(data_matrix, user_map, product_map, output_dir):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-
-    data_filepath = os.path.join(output_dir, "data_processed.npy")
-    np.save(data_filepath, data_matrix)
-    print(f"Saved data matrix to {data_filepath}")
+    if data_matrix is not None:
+        data_filepath = os.path.join(output_dir, "data_processed.npy")
+        np.save(data_filepath, data_matrix)
+        print(f"Saved processed data matrix to {data_filepath}")
+    else:
+        print("No data matrix to save.")
 
     with open(os.path.join(output_dir, "user_map.pkl"), "wb") as f:
         pickle.dump(user_map, f)
@@ -106,6 +103,31 @@ def filter_k_core(data, k=5):
             break
     return filtered_data
 
+def reindex_data(data, old_user_map, old_product_map):
+    """Re-indexes data to ensure continuous IDs (0, 1, 2...) and updates maps."""
+    unique_users, new_user_indices = np.unique(data[:, 0], return_inverse=True)
+    unique_products, new_product_indices = np.unique(data[:, 1], return_inverse=True)
+    
+    new_data = data.copy()
+    new_data[:, 0] = new_user_indices
+    new_data[:, 1] = new_product_indices
+    
+    # Update Maps
+    inv_old_user_map = {v: k for k, v in old_user_map.items()}
+    inv_old_product_map = {v: k for k, v in old_product_map.items()}
+    
+    new_user_map = {}
+    for new_idx, old_idx in enumerate(unique_users):
+        if int(old_idx) in inv_old_user_map:
+            new_user_map[inv_old_user_map[int(old_idx)]] = new_idx
+            
+    new_product_map = {}
+    for new_idx, old_idx in enumerate(unique_products):
+        if int(old_idx) in inv_old_product_map:
+            new_product_map[inv_old_product_map[int(old_idx)]] = new_idx
+            
+    return new_data, new_user_map, new_product_map
+
 def add_time_features(data):
     """
     Adds 'Year' and 'Time_Weight'.
@@ -123,7 +145,7 @@ def add_time_features(data):
 
 def perform_hypothesis_test(data, year_a=2013, year_b=2014, confidence_level=0.95):
     """Performs Z-Test comparing ratings between two years."""
-    print(f"\nPerforming Z-Test: Ratings in {year_b} > {year_a}?")
+    print(f"Performing Z-Test: Ratings in {year_b} > {year_a}?")
     print(f"Hypothesis: H0: Mean_B <= Mean_A | H1: Mean_B > Mean_A")
     print(f"Confidence Level: {confidence_level * 100}%")
 
