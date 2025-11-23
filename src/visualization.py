@@ -139,3 +139,27 @@ def plot_user_consistency(data):
     plt.legend()
     plt.grid(axis="y", linestyle="--", alpha=0.5)
     plt.show()
+
+def plot_learning_curve(train_history, test_history=None):
+    """
+    Plots the RMSE learning curve over epochs.
+    
+    Args:
+        train_history (list): List of RMSE values for training set.
+        test_history (list): List of RMSE values for test set (optional).
+    """
+    plt.figure(figsize=(10, 6))
+    
+    # Plot Train RMSE
+    plt.plot(train_history, label="Train RMSE", marker='o', color='blue')
+    
+    # Plot Test RMSE (if available)
+    if test_history and len(test_history) > 0:
+        plt.plot(test_history, label="Test RMSE", marker='s', color='orange')
+    
+    plt.title("Matrix Factorization Learning Curve", fontsize=16)
+    plt.xlabel("Epochs", fontsize=12)
+    plt.ylabel("RMSE", fontsize=12)
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.show()

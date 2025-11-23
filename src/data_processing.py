@@ -5,60 +5,57 @@ import csv
 
 def process_csv_to_numpy(input_filepath):
     print(f"Starting to process CSV file: {input_filepath}")
-
     user_map = {}
     product_map = {}
-
     current_user_index = 0
     current_product_index = 0
-
     temp_data = []
     corrupted_rows = []
 
     try:
         with open(input_filepath, "r", encoding="utf-8") as file:
             reader = csv.reader(file)
-            header = next(reader)  # Skip header row
+            header = next(reader, None)
 
             for i, row in enumerate(reader):
-                # # Check for corrupted rows (missing columns)
                 if len(row) < 4:
                     corrupted_rows.append((i, row))
                     continue
+                
                 user_str, product_str, rating_str, timestamp_str = row
 
                 if user_str not in user_map:
                     user_map[user_str] = current_user_index
                     current_user_index += 1
-                user_index = user_map[user_str]
-
+                
                 if product_str not in product_map:
                     product_map[product_str] = current_product_index
                     current_product_index += 1
-                product_index = product_map[product_str]
 
                 try:
-                    temp_data.append([user_index, product_index, float(rating_str), int(timestamp_str)])
+                    temp_data.append([user_map[user_str], product_map[product_str], float(rating_str), int(timestamp_str)])
                 except ValueError:
                     corrupted_rows.append((i, row))
                     continue
+                    
     except FileNotFoundError:
         print(f"Error: File {input_filepath} not found.")
         return None, None, None, []
     
-    print(f"Converting data to NumPy array.")
     data_matrix = np.array(temp_data, dtype=np.float32)
-
+    print(f"Raw Data shape: {data_matrix.shape}")
     return data_matrix, user_map, product_map, corrupted_rows
 
 
 def save_processed_data(data_matrix, user_map, product_map, output_dir):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-
-    data_filepath = os.path.join(output_dir, "ratings_data.npy")
-    np.save(data_filepath, data_matrix)
-    print(f"Saved data matrix to {data_filepath}")
+    if data_matrix is not None:
+        data_filepath = os.path.join(output_dir, "data_processed.npy")
+        np.save(data_filepath, data_matrix)
+        print(f"Saved processed data matrix to {data_filepath}")
+    else:
+        print("No data matrix to save.")
 
     with open(os.path.join(output_dir, "user_map.pkl"), "wb") as f:
         pickle.dump(user_map, f)
@@ -69,7 +66,7 @@ def save_processed_data(data_matrix, user_map, product_map, output_dir):
     print(f"Saved user and product maps to {output_dir}")
 
 def load_processed_data(input_dir):
-    data_filepath = os.path.join(input_dir, "ratings_data.npy")
+    data_filepath = os.path.join(input_dir, "data_processed.npy")
     user_map_filepath = os.path.join(input_dir, "user_map.pkl")
     product_map_filepath = os.path.join(input_dir, "product_map.pkl")
 
@@ -106,5 +103,111 @@ def filter_k_core(data, k=5):
             break
     return filtered_data
 
+def reindex_data(data, old_user_map, old_product_map):
+    """Re-indexes data to ensure continuous IDs (0, 1, 2...) and updates maps."""
+    unique_users, new_user_indices = np.unique(data[:, 0], return_inverse=True)
+    unique_products, new_product_indices = np.unique(data[:, 1], return_inverse=True)
+    
+    new_data = data.copy()
+    new_data[:, 0] = new_user_indices
+    new_data[:, 1] = new_product_indices
+    
+    # Update Maps
+    inv_old_user_map = {v: k for k, v in old_user_map.items()}
+    inv_old_product_map = {v: k for k, v in old_product_map.items()}
+    
+    new_user_map = {}
+    for new_idx, old_idx in enumerate(unique_users):
+        if int(old_idx) in inv_old_user_map:
+            new_user_map[inv_old_user_map[int(old_idx)]] = new_idx
+            
+    new_product_map = {}
+    for new_idx, old_idx in enumerate(unique_products):
+        if int(old_idx) in inv_old_product_map:
+            new_product_map[inv_old_product_map[int(old_idx)]] = new_idx
+            
+    return new_data, new_user_map, new_product_map
 
- 
+def add_time_features(data):
+    """
+    Adds 'Year' and 'Time_Weight'.
+    Time_Weight is scaled from 0.2 to 1.0 based on recency.
+    Returns: Enhanced Matrix (N, 6) -> [User, Item, Rating, Time, Year, Weight]
+    """
+    timestamps = data[:, 3].astype(int)
+    years = 1970 + (timestamps / 31536000)
+
+    min_time, max_time = timestamps.min(), timestamps.max()
+    time_weights = 0.2 + 0.8 * (timestamps - min_time) / (max_time - min_time)
+
+    enhanced_data = np.hstack((data, years.reshape(-1, 1), time_weights.reshape(-1, 1)))
+    return enhanced_data
+
+def perform_hypothesis_test(data, year_a=2013, year_b=2014, confidence_level=0.95):
+    """Performs Z-Test comparing ratings between two years."""
+    print(f"Performing Z-Test: Ratings in {year_b} > {year_a}?")
+    print(f"Hypothesis: H0: Mean_B <= Mean_A | H1: Mean_B > Mean_A")
+    print(f"Confidence Level: {confidence_level * 100}%")
+
+    z_critical_table = {
+        0.90: 1.282,
+        0.95: 1.645,
+        0.99: 2.326
+    }
+
+    if confidence_level not in z_critical_table:
+        print(f"Error: Confidence level {confidence_level} is not supported in NumPy-only mode.")
+        print("Supported levels: 0.90, 0.95, 0.99")
+        return
+    z_critical = z_critical_table[confidence_level]
+    
+    # Year is at index 4
+    years_col = data[:, 4].astype(int)
+    ratings_a = data[years_col == year_a, 2]
+    ratings_b = data[years_col == year_b, 2]
+    
+    if len(ratings_a) == 0 or len(ratings_b) == 0:
+        print("Error: Not enough data for specified years.")
+        return
+
+    mean_a, var_a, n_a = np.mean(ratings_a), np.var(ratings_a), len(ratings_a)
+    mean_b, var_b, n_b = np.mean(ratings_b), np.var(ratings_b), len(ratings_b)
+    
+    print(f"   {year_a}: Mean={mean_a:.4f}, N={n_a}")
+    print(f"   {year_b}: Mean={mean_b:.4f}, N={n_b}")
+    
+    # Z-score calculation
+    pooled_se = np.sqrt((var_b / n_b) + (var_a / n_a))
+    if pooled_se == 0:
+        print("Error: Pooled standard error is zero, cannot compute Z-score.")
+        return
+
+    z_score = (mean_b - mean_a) / pooled_se
+    
+    print(f"   Z-Score: {z_score:.4f}")
+    if z_score > 1.645: 
+        print("   Result: Reject H0. Statistically Significant.")
+    else:
+        print("   Result: Fail to reject H0.")
+
+def standardize_ratings(data):
+    ratings = data[:, 2]
+    mean_rating = np.mean(ratings)
+    std_rating = np.std(ratings)
+
+    standardized_ratings = (ratings - mean_rating) / std_rating
+    standardized_data = data.copy()
+    standardized_data[:, 2] = standardized_ratings
+
+    return standardized_data, mean_rating, std_rating
+
+def split_train_test(data, train_ratio=0.8):
+    """Splits data based on Timestamp."""
+    sorted_indices = np.argsort(data[:, 3])
+    data_sorted = data[sorted_indices]
+
+    num_train = int(len(data) * train_ratio)
+    train_data = data_sorted[:num_train]
+    test_data = data_sorted[num_train:]
+
+    return train_data, test_data
