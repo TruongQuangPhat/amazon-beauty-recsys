@@ -83,14 +83,11 @@ Dự án yêu cầu Python phiên bản 3.8 trở lên. Khuyến khích sử d�
 
 **Bước 1: Clone repository**
 
-Tải mã nguồn dự án về máy của bạn:
 ```bash
 git clone https://github.com/TruongQuangPhat/amazon-beauty-recsys.git
 cd amazon-beauty-recsys
 ```
 **Bước 2: Tạo và Kích hoạt môi trường ảo (Virtual Environment)**
-
-Việc này giúp cô lập các thư viện của dự án với hệ thống chính.
 
 **Trên Windowns:**
 ```bash
@@ -106,7 +103,6 @@ source venv/bin/activate
 
 **Bước 3: Cài đặt thư viện phụ thuộc**
 
-Cài đặt các thư viện cần thiết (NumPy, Matplotlib, Seaborn) được liệt kê trong file `requirements.txt`:
 ```bash
 pip install -r requirements.txt
 ```
