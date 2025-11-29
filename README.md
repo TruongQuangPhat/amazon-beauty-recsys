@@ -114,6 +114,7 @@ pip install -r requirements.txt
 
 ### Usage
 Chạy lần lượt các Notebook theo thứ tự:
+
 **Bước 1: Khám phá \& Nạp dữ liệu (Exploration)**
 - Chạy `notebooks/01_data_exploration.ipynb`.
 - **Nhiệm vụ:** Đọc file CSV gốc, chuyển đổi sang NumPy Object Array và lưu file tạm (`data_raw.npy`) vào thư mục `processed/`.
