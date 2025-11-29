@@ -1,6 +1,4 @@
 ### Amazon Beauty Recommendation System
-    A Matrix Factorization Recommendation System built from scratch using only NumPy.
-
 Project này xây dựng một hệ thống gợi ý sản phẩm làm đẹp (Beauty Products) trên Amazon, sử dụng thuật toán **Matrix Factorization** với kỹ thuật tối ưu **Stochastic Gradient Descent (SGD)**. Điểm đặc biệt của dự án này là toàn bộ quy trình xử lý dữ liệu và thuật toán được xây dựng thủ công bằng thư viện **NumPy**, không sử dụng các framework cấp cao như Scikit-learn hay Pandas cho các tác vụ cốt lõi.
 
 ### Mục lục
